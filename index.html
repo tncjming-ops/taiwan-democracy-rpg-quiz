@@ -1,0 +1,2192 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>勇者鬥惡龍：戰後臺灣的民主發展 — RPG 答題對決</title>
+  <style>
+    :root {
+      --bg-deep: #0b0f19;
+      --bg-panel: rgba(16, 23, 41, 0.92);
+      --bg-card: rgba(24, 34, 58, 0.95);
+      --gold: #f59e0b;
+      --gold-light: #fde68a;
+      --gold-glow: rgba(245, 158, 11, 0.55);
+      --hero-blue: #38bdf8;
+      --hero-glow: rgba(56, 189, 248, 0.6);
+      --monster-red: #ef4444;
+      --monster-purple: #a855f7;
+      --monster-glow: rgba(239, 68, 68, 0.6);
+      --hp-green: #22c55e;
+      --mp-cyan: #06b6d4;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-rpg: #475569;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+      background: radial-gradient(circle at 50% 15%, #1e293b 0%, #090d16 75%, #05070c 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* 頂部冒險者公會狀態列 */
+    .top-hud {
+      width: 100%;
+      max-width: 1024px;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(15, 23, 42, 0.85) 100%);
+      border-bottom: 2px solid var(--gold);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.65);
+      padding: 10px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, #f59e0b, #b45309);
+      color: #fff;
+      font-weight: 900;
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--gold-light);
+      box-shadow: 0 0 10px var(--gold-glow);
+      letter-spacing: 0.5px;
+    }
+
+    .brand-name {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--gold-light);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    }
+
+    .hud-stats {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .stat-pill {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #e2e8f0;
+    }
+
+    .stat-pill .val {
+      color: var(--gold-light);
+      font-weight: 900;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+    }
+
+    .nav-btn {
+      background: rgba(30, 41, 59, 0.85);
+      color: #cbd5e1;
+      border: 1px solid #475569;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .nav-btn:hover {
+      border-color: var(--gold);
+      color: #fff;
+    }
+
+    .nav-btn.active {
+      background: linear-gradient(135deg, #d97706, #92400e);
+      color: #fff;
+      border-color: var(--gold-light);
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
+    }
+
+    /* 主容器 */
+    .game-container {
+      width: 100%;
+      max-width: 1024px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+    }
+
+    .view-section {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .view-section.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* =====================================================
+       模組一：雙人對峙真實戰鬥擂台與立體景深 (Battle Arena & DoF)
+       ===================================================== */
+    .battle-stage-wrapper {
+      position: relative;
+      width: 100%;
+      height: 350px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 2px solid rgba(245, 158, 11, 0.55);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85), inset 0 0 40px rgba(0, 0, 0, 0.7);
+      background: linear-gradient(180deg, #1e1b4b 0%, #31102f 55%, #1f2937 100%);
+    }
+
+    /* 1. 背景獨立分層與微模糊虛化 (DoF) */
+    .battle-arena-bg {
+      position: absolute;
+      inset: -12px;
+      background-image: url('assets/images/battle_arena_bg.jpg'), radial-gradient(circle at 50% 35%, #4338ca 0%, #1e1b4b 50%, #0f172a 100%);
+      background-size: cover;
+      background-position: center bottom;
+      filter: blur(2.5px) brightness(0.72) contrast(1.06);
+      transform: scale(1.08);
+      z-index: 1;
+      transition: filter 0.4s ease;
+    }
+
+    /* 2. 暗角與漸層遮罩 (Vignette Overlay) */
+    .battle-arena-overlay {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 60%, rgba(7, 12, 20, 0.15) 0%, rgba(7, 12, 20, 0.6) 75%, rgba(7, 12, 20, 0.88) 100%),
+        linear-gradient(180deg, rgba(7, 12, 20, 0.45) 0%, transparent 35%, rgba(7, 12, 20, 0.88) 100%);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* 擂台石板地面透視格線 */
+    .arena-floor-plane {
+      position: absolute;
+      left: -10%;
+      right: -10%;
+      bottom: -25px;
+      height: 120px;
+      background: radial-gradient(ellipse at 50% 30%, rgba(245, 158, 11, 0.14) 0%, rgba(15, 23, 42, 0.7) 65%, transparent 100%);
+      border-top: 1px solid rgba(253, 230, 138, 0.2);
+      transform: perspective(300px) rotateX(55deg);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* 頂部中央關卡與連擊資訊橫幅 */
+    .arena-top-banner {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      pointer-events: none;
+    }
+
+    .stage-chapter-tag {
+      background: rgba(15, 23, 42, 0.88);
+      border: 1.5px solid var(--gold);
+      color: var(--gold-light);
+      padding: 4px 16px;
+      border-radius: 999px;
+      font-size: 0.84rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+      white-space: nowrap;
+    }
+
+    .combo-badge {
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      color: #fff;
+      font-weight: 900;
+      font-size: 0.82rem;
+      padding: 2px 12px;
+      border-radius: 999px;
+      border: 1px solid #fca5a5;
+      box-shadow: 0 0 14px rgba(239, 68, 68, 0.8);
+      opacity: 0;
+      transform: scale(0.7);
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .combo-badge.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* 雙人對峙容器 */
+    .fighters-duel-zone {
+      position: relative;
+      z-index: 5;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 46px 7% 20px;
+    }
+
+    .fighter-unit {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 220px;
+    }
+
+    /* 4. 常駐頭頂資訊氣泡 */
+    .status-bubble {
+      width: 210px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1.5px solid rgba(148, 163, 184, 0.45);
+      border-radius: 12px;
+      padding: 7px 10px;
+      margin-bottom: 8px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      z-index: 8;
+    }
+
+    .fighter-player .status-bubble {
+      border-color: rgba(56, 189, 248, 0.65);
+    }
+
+    .fighter-monster .status-bubble {
+      border-color: rgba(239, 68, 68, 0.65);
+    }
+
+    .bubble-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .bubble-name {
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .bubble-lv {
+      font-size: 0.72rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--gold-light);
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 11px;
+      background: #1e293b;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      position: relative;
+    }
+
+    .hp-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #16a34a, #4ade80);
+      border-radius: 999px;
+      transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+    }
+
+    .fighter-monster .hp-fill {
+      background: linear-gradient(90deg, #dc2626, #f87171);
+      box-shadow: 0 0 8px rgba(248, 113, 113, 0.6);
+    }
+
+    .mp-track {
+      width: 100%;
+      height: 7px;
+      background: #1e293b;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 4px;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    .mp-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #0284c7, #38bdf8, #a855f7);
+      border-radius: 999px;
+      transition: width 0.35s ease;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+    }
+
+    .bar-text {
+      font-size: 0.7rem;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      margin-top: 3px;
+      font-weight: 700;
+    }
+
+    /* =====================================================
+       模組二：2.5D「類 Live2D」角色微動態動畫與 3D 地面投影
+       ===================================================== */
+    .fighter-standee {
+      position: relative;
+      width: 185px;
+      height: 195px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 6;
+    }
+
+    /* 角色背後旋轉光環／法陣 (.fighter-aura-halo) */
+    .fighter-aura-halo {
+      position: absolute;
+      width: 160px;
+      height: 160px;
+      bottom: 18px;
+      border-radius: 50%;
+      border: 2px dashed rgba(56, 189, 248, 0.38);
+      box-shadow: inset 0 0 22px rgba(56, 189, 248, 0.22), 0 0 20px rgba(56, 189, 248, 0.2);
+      animation: rotateHalo 14s linear infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .fighter-monster .fighter-aura-halo {
+      border-color: rgba(239, 68, 68, 0.42);
+      box-shadow: inset 0 0 25px rgba(239, 68, 68, 0.28), 0 0 22px rgba(168, 85, 247, 0.28);
+      animation-direction: reverse;
+      animation-duration: 11s;
+    }
+
+    @keyframes rotateHalo {
+      from { transform: rotate(0deg) scale(1); }
+      50% { transform: rotate(180deg) scale(1.05); }
+      to { transform: rotate(360deg) scale(1); }
+    }
+
+    /* 3. 足底橢圓徑向漸層地面陰影 (.shadow-dock) */
+    .shadow-dock {
+      position: absolute;
+      bottom: 2px;
+      width: 140px;
+      height: 28px;
+      background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.5) 52%, transparent 76%);
+      border-radius: 50%;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .hero-shadow {
+      animation: heroShadowPulse 3.4s ease-in-out infinite;
+    }
+
+    .monster-shadow {
+      width: 155px;
+      animation: monsterShadowPulse 2.7s ease-in-out infinite;
+    }
+
+    @keyframes heroShadowPulse {
+      0%, 100% { transform: scale(1, 1); opacity: 0.88; }
+      60% { transform: scale(0.9, 0.85); opacity: 0.68; }
+    }
+
+    @keyframes monsterShadowPulse {
+      0%, 100% { transform: scale(1, 1); opacity: 0.9; }
+      50% { transform: scale(0.92, 0.86); opacity: 0.7; }
+    }
+
+    /* 角色透明立繪與雙層 drop-shadow */
+    .fighter-figure-wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 4;
+    }
+
+    .fighter-standee img,
+    .fighter-standee .fallback-svg {
+      max-width: 185px;
+      max-height: 190px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    /* 主角聖光輪廓 */
+    .fighter-player .fighter-standee img,
+    .fighter-player .fighter-standee .fallback-svg {
+      filter: drop-shadow(0 14px 20px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 12px rgba(56, 189, 248, 0.55));
+    }
+
+    /* 怪物魔氣輪廓 */
+    .fighter-monster .fighter-standee img,
+    .fighter-monster .fighter-standee .fallback-svg {
+      filter: drop-shadow(0 14px 20px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 14px rgba(239, 68, 68, 0.55));
+    }
+
+    /* 1. 待機有機呼吸律動 (Breathing Rhythm) */
+    .hero-live-figure {
+      transform-origin: 50% 92%;
+      animation: heroBreathe 3.4s ease-in-out infinite;
+    }
+
+    @keyframes heroBreathe {
+      0%, 100% { transform: translateY(0) scale(1, 1) rotate(0deg); }
+      30% { transform: translateY(-3px) scale(0.985, 1.028) rotate(0.8deg); }
+      60% { transform: translateY(-7px) scale(0.975, 1.045) rotate(-0.6deg); }
+      85% { transform: translateY(-2px) scale(1.01, 0.99) rotate(0.3deg); }
+    }
+
+    .monster-live-figure {
+      transform-origin: 50% 92%;
+      animation: monsterBreathe 2.7s ease-in-out infinite;
+    }
+
+    @keyframes monsterBreathe {
+      0%, 100% { transform: translateY(0) scale(1, 1) rotate(0deg); }
+      35% { transform: translateY(-5px) scale(1.03, 0.98) rotate(-1.2deg); }
+      70% { transform: translateY(-9px) scale(0.98, 1.05) rotate(1deg); }
+    }
+
+    /* 2. 普攻出招揮砍突刺 (Dash & Slash) */
+    .anim-hero-slash {
+      animation: heroSlashDash 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+    }
+
+    @keyframes heroSlashDash {
+      0% { transform: translateX(0) scale(1) rotate(0); }
+      30% { transform: translateX(-15px) scale(0.96) rotate(-6deg); }
+      70% { transform: translateX(75px) scale(1.18, 1.05) rotate(7deg) skewX(-6deg); filter: brightness(1.4) drop-shadow(0 0 20px #38bdf8); }
+      100% { transform: translateX(0) scale(1) rotate(0); }
+    }
+
+    .anim-monster-slash {
+      animation: monsterSlashDash 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+    }
+
+    @keyframes monsterSlashDash {
+      0% { transform: translateX(0) scale(1) rotate(0); }
+      30% { transform: translateX(15px) scale(0.96) rotate(6deg); }
+      70% { transform: translateX(-75px) scale(1.18, 1.05) rotate(-7deg) skewX(6deg); filter: brightness(1.4) drop-shadow(0 0 22px #ef4444); }
+      100% { transform: translateX(0) scale(1) rotate(0); }
+    }
+
+    /* 3. 受創後仰扭曲 (Hurt Impact) */
+    .anim-hurt-impact {
+      animation: heroHurtImpact 0.5s ease-out forwards !important;
+    }
+
+    @keyframes heroHurtImpact {
+      0% { transform: translateX(0) rotate(0); filter: brightness(1); }
+      20% { transform: translateX(-22px) rotate(-12deg) scale(0.9); filter: brightness(2.5) drop-shadow(0 0 22px #ef4444); }
+      50% { transform: translateX(8px) rotate(4deg); }
+      100% { transform: translateX(0) rotate(0); }
+    }
+
+    .anim-monster-hurt {
+      animation: monsterHurtImpact 0.5s ease-out forwards !important;
+    }
+
+    @keyframes monsterHurtImpact {
+      0% { transform: translateX(0) rotate(0); filter: brightness(1); }
+      20% { transform: translateX(22px) rotate(12deg) scale(0.9); filter: brightness(2.6) drop-shadow(0 0 24px #f59e0b); }
+      50% { transform: translateX(-8px) rotate(-4deg); }
+      100% { transform: translateX(0) rotate(0); }
+    }
+
+    /* 4. 大招施法浮空蓄能 (Cast Ultimate) */
+    .anim-cast-ultimate {
+      animation: castUltimateAnim 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+    }
+
+    @keyframes castUltimateAnim {
+      0% { transform: translateY(0) scale(1); }
+      45% { transform: translateY(-34px) scale(1.16); filter: brightness(1.85) drop-shadow(0 0 28px #f59e0b) drop-shadow(0 0 42px #a855f7); }
+      75% { transform: translateX(95px) translateY(-10px) scale(1.25) rotate(8deg); filter: brightness(2.2) drop-shadow(0 0 35px #fde047); }
+      100% { transform: translateY(0) scale(1); }
+    }
+
+    /* 螢幕震動與大招閃光 */
+    .screen-shake {
+      animation: stageShake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+    }
+
+    @keyframes stageShake {
+      10%, 90% { transform: translate3d(-4px, 2px, 0); }
+      20%, 80% { transform: translate3d(6px, -3px, 0); }
+      30%, 50%, 70% { transform: translate3d(-8px, 4px, 0); }
+      40%, 60% { transform: translate3d(8px, -2px, 0); }
+    }
+
+    .ultimate-flash-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle, rgba(253, 224, 71, 0.75) 0%, rgba(168, 85, 247, 0.55) 60%, transparent 100%);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 15;
+    }
+
+    .ultimate-flash-overlay.flash {
+      animation: ultFlash 0.8s ease-out;
+    }
+
+    @keyframes ultFlash {
+      0% { opacity: 0; }
+      25% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* 浮動傷害跳字 (Floating Damage Numbers) */
+    .floating-dmg {
+      position: absolute;
+      top: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.65rem;
+      font-weight: 900;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 20;
+      text-shadow: 0 3px 8px rgba(0, 0, 0, 0.95), 0 0 12px currentColor;
+      animation: floatUpDmg 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .floating-dmg.crit {
+      font-size: 2.1rem;
+      color: #fde047;
+    }
+
+    .floating-dmg.normal {
+      color: #38bdf8;
+    }
+
+    .floating-dmg.hurt {
+      color: #f87171;
+    }
+
+    .floating-dmg.heal {
+      color: #4ade80;
+      font-size: 1.35rem;
+    }
+
+    @keyframes floatUpDmg {
+      0% { opacity: 0; transform: translate(-50%, 10px) scale(0.6); }
+      20% { opacity: 1; transform: translate(-50%, -12px) scale(1.18); }
+      80% { opacity: 1; transform: translate(-50%, -42px) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -58px) scale(0.9); }
+    }
+
+    /* =====================================================
+       模組三：蓄力大絕招列與答題戰鬥指令面板
+       ===================================================== */
+    .battle-control-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--bg-panel);
+      border: 1.5px solid rgba(245, 158, 11, 0.35);
+      border-radius: 12px;
+      padding: 10px 16px;
+      flex-wrap: wrap;
+    }
+
+    .quest-progress-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
+    .category-chip {
+      background: rgba(56, 189, 248, 0.16);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      color: #7dd3fc;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+
+    /* 蓄力大絕招按鈕 */
+    .ultimate-btn {
+      background: linear-gradient(135deg, #334155, #1e293b);
+      color: #94a3b8;
+      border: 1.5px solid #475569;
+      padding: 8px 18px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 900;
+      cursor: not-allowed;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.25s ease;
+    }
+
+    .ultimate-btn.ready {
+      background: linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%);
+      color: #fff;
+      border-color: #fef08a;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.8), 0 0 35px rgba(168, 85, 247, 0.6);
+      animation: ultPulse 1.3s ease-in-out infinite;
+    }
+
+    @keyframes ultPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); box-shadow: 0 0 28px rgba(253, 224, 71, 0.95), 0 0 45px rgba(236, 72, 153, 0.85); }
+    }
+
+    /* 題目與四選一指令區 */
+    .quiz-command-card {
+      background: var(--bg-panel);
+      border: 2px solid rgba(148, 163, 184, 0.35);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .question-prompt {
+      font-size: 1.14rem;
+      line-height: 1.55;
+      font-weight: 800;
+      color: #f8fafc;
+      background: rgba(15, 23, 42, 0.65);
+      padding: 14px 16px;
+      border-radius: 12px;
+      border-left: 5px solid var(--gold);
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .option-btn {
+      background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+      border: 1.5px solid rgba(148, 163, 184, 0.4);
+      border-radius: 12px;
+      padding: 13px 15px;
+      color: #f1f5f9;
+      font-size: 0.98rem;
+      font-weight: 700;
+      line-height: 1.45;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      transition: all 0.18s ease;
+    }
+
+    .option-btn:hover:not(:disabled) {
+      border-color: var(--gold-light);
+      background: linear-gradient(180deg, rgba(51, 65, 85, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 15px rgba(245, 158, 11, 0.22);
+    }
+
+    .option-btn:disabled {
+      cursor: default;
+    }
+
+    .opt-key {
+      min-width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid var(--gold);
+      color: var(--gold-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+
+    .option-btn.correct-choice {
+      background: linear-gradient(135deg, rgba(22, 163, 74, 0.38), rgba(20, 83, 45, 0.85)) !important;
+      border-color: #4ade80 !important;
+      color: #fff !important;
+      box-shadow: 0 0 18px rgba(74, 222, 128, 0.45);
+    }
+
+    .option-btn.wrong-choice {
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.38), rgba(127, 29, 29, 0.85)) !important;
+      border-color: #f87171 !important;
+      color: #fecaca !important;
+    }
+
+    /* 【名師解題秘笈】解析抽屜 */
+    .explanation-box {
+      display: none;
+      background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(15, 23, 42, 0.98));
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      padding: 15px 18px;
+      gap: 10px;
+      flex-direction: column;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.75);
+      animation: fadeIn 0.28s ease;
+    }
+
+    .explanation-box.show {
+      display: flex;
+    }
+
+    .exp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 900;
+      font-size: 1rem;
+      color: var(--gold-light);
+    }
+
+    .exp-body {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+
+    .next-btn {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+      border: 1px solid var(--gold-light);
+      padding: 9px 22px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 0.92rem;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+      transition: transform 0.15s ease;
+    }
+
+    .next-btn:hover {
+      transform: scale(1.04);
+    }
+
+    /* =====================================================
+       模組五：冒險者公會大廳 (Hub / Home) 養成與章節選擇
+       ===================================================== */
+    .guild-hub-banner {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      min-height: 210px;
+      border: 2px solid var(--gold);
+      background-image: url('assets/images/hub_home_bg.jpg'), linear-gradient(135deg, #3b1d0f 0%, #1e1b4b 100%);
+      background-size: cover;
+      background-position: center;
+      display: flex;
+      align-items: flex-end;
+      padding: 20px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75);
+    }
+
+    .guild-hub-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(11, 15, 25, 0.35) 0%, rgba(11, 15, 25, 0.9) 100%);
+      z-index: 1;
+    }
+
+    .guild-hub-content {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .guild-hero-profile {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .guild-avatar-frame {
+      width: 84px;
+      height: 84px;
+      border-radius: 16px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.25), rgba(15, 23, 42, 0.9));
+      border: 2px solid var(--gold-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: 0 0 18px var(--gold-glow);
+    }
+
+    .guild-avatar-frame img {
+      width: 92%;
+      height: 92%;
+      object-fit: contain;
+    }
+
+    .guild-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 14px;
+    }
+
+    .rpg-panel {
+      background: var(--bg-panel);
+      border: 1.5px solid rgba(245, 158, 11, 0.35);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: var(--gold-light);
+      border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+      padding-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .upgrade-item {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .up-btn {
+      background: linear-gradient(135deg, #f59e0b, #b45309);
+      color: #fff;
+      border: 1px solid var(--gold-light);
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 0.82rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .up-btn:disabled {
+      background: #334155;
+      border-color: #475569;
+      color: #64748b;
+      cursor: not-allowed;
+    }
+
+    .chapter-card {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1.5px solid rgba(148, 163, 184, 0.35);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .chapter-card:hover {
+      border-color: var(--gold);
+      transform: translateX(3px);
+    }
+
+    .chapter-card.cleared {
+      border-color: rgba(74, 222, 128, 0.6);
+    }
+
+    /* 知識魔導書 (Codex) */
+    .codex-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .codex-item {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      border-left: 4px solid var(--hero-blue);
+      border-radius: 10px;
+      padding: 12px 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* 結算彈窗 Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 7, 12, 0.85);
+      backdrop-filter: blur(6px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+    }
+
+    .modal-card {
+      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+      border: 2px solid var(--gold);
+      border-radius: 18px;
+      max-width: 460px;
+      width: 100%;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* 手機響應式 RWD */
+    @media (max-width: 720px) {
+      .battle-stage-wrapper {
+        height: 295px;
+      }
+      .fighters-duel-zone {
+        padding: 44px 3% 14px;
+      }
+      .fighter-unit {
+        width: 155px;
+      }
+      .status-bubble {
+        width: 152px;
+        padding: 5px 8px;
+      }
+      .fighter-standee {
+        width: 138px;
+        height: 150px;
+      }
+      .fighter-standee img,
+      .fighter-standee .fallback-svg {
+        max-width: 138px;
+        max-height: 145px;
+      }
+      .options-grid {
+        grid-template-columns: 1fr;
+      }
+      .question-prompt {
+        font-size: 1.02rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 頂部冒險者公會導覽列 -->
+  <header class="top-hud">
+    <div class="brand-title">
+      <span class="brand-badge">六上社會 RPG</span>
+      <span class="brand-name">⚔️ 勇者傳說：戰後臺灣的民主發展</span>
+    </div>
+
+    <div class="hud-stats">
+      <div class="stat-pill" title="勇者境界稱號">
+        <span>🛡️ 稱號：</span>
+        <span class="val" id="hudRankTitle">見習冒險者</span>
+      </div>
+      <div class="stat-pill" title="討伐獲得的勇者金幣，可於公會強化能力">
+        <span>🪙 金幣：</span>
+        <span class="val" id="hudGold">100</span>
+      </div>
+      <div class="stat-pill" title="累積討伐勝利題數">
+        <span>⭐ 勝場：</span>
+        <span class="val" id="hudWins">0</span>
+      </div>
+    </div>
+
+    <nav class="nav-tabs">
+      <button class="nav-btn active" id="tabBattleBtn" onclick="switchView('battle')">⚔️ 對決擂台</button>
+      <button class="nav-btn" id="tabGuildBtn" onclick="switchView('guild')">🏰 冒險者公會</button>
+      <button class="nav-btn" id="tabCodexBtn" onclick="switchView('codex')">📜 知識魔導書</button>
+      <button class="nav-btn" id="soundToggleBtn" onclick="toggleMute()" title="切換音效">🔊</button>
+    </nav>
+  </header>
+
+  <main class="game-container">
+
+    <!-- ==================== 視圖 1：雙人對峙戰鬥擂台 ==================== -->
+    <section class="view-section active" id="view-battle">
+
+      <div class="battle-stage-wrapper" id="battleStageWrapper">
+        <!-- 1. 景深微模糊戰場背景 -->
+        <div class="battle-arena-bg" id="battleArenaBg"></div>
+        <!-- 2. 暗角與漸層遮罩 -->
+        <div class="battle-arena-overlay"></div>
+        <div class="arena-floor-plane"></div>
+        <!-- 大招全螢幕閃光層 -->
+        <div class="ultimate-flash-overlay" id="ultFlashOverlay"></div>
+
+        <!-- 頂部關卡章節與連擊數 -->
+        <div class="arena-top-banner">
+          <div class="stage-chapter-tag" id="stageChapterTag">第一章：破曉迷霧之森（戰後初期與二二八事件）</div>
+          <div class="combo-badge" id="comboBadge">🔥 0 COMBO 連擊！</div>
+        </div>
+
+        <!-- 左右雙人對峙區 -->
+        <div class="fighters-duel-zone">
+
+          <!-- 左側：主角 (Hero) -->
+          <div class="fighter-unit fighter-player">
+            <div class="status-bubble">
+              <div class="bubble-header">
+                <span class="bubble-name">🗡️ 自由勇者・艾爾</span>
+                <span class="bubble-lv" id="heroLvTag">Lv.1</span>
+              </div>
+              <div class="bar-track">
+                <div class="hp-fill" id="heroHpBar"></div>
+              </div>
+              <div class="mp-track" title="魔力蓄能條 (答對每題 +35%)">
+                <div class="mp-fill" id="heroMpBar"></div>
+              </div>
+              <div class="bar-text">
+                <span id="heroHpText">HP 200/200</span>
+                <span id="heroMpText" style="color:#38bdf8;">MP 0%</span>
+              </div>
+            </div>
+
+            <div class="fighter-standee" id="heroStandee">
+              <div class="fighter-aura-halo"></div>
+              <div class="shadow-dock hero-shadow"></div>
+              <div class="fighter-figure-wrap hero-live-figure" id="heroFigure">
+                <img
+                  id="heroSpriteImg"
+                  src="assets/images/hero_battle_sprite.webp"
+                  alt="自由勇者立繪"
+                  onerror="handleSpriteFallback(this, 'hero')"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- 右側：守關魔物 (Monster / Boss) -->
+          <div class="fighter-unit fighter-monster">
+            <div class="status-bubble">
+              <div class="bubble-header">
+                <span class="bubble-name" id="monsterNameLabel">🐲 闇鐵鎖鏈魔龍</span>
+                <span class="bubble-lv" id="monsterLvTag">BOSS</span>
+              </div>
+              <div class="bar-track">
+                <div class="hp-fill" id="monsterHpBar"></div>
+              </div>
+              <div class="bar-text">
+                <span id="monsterHpText">HP 300/300</span>
+                <span id="monsterPercentText" style="color:#fca5a5;">100%</span>
+              </div>
+            </div>
+
+            <div class="fighter-standee" id="monsterStandee">
+              <div class="fighter-aura-halo"></div>
+              <div class="shadow-dock monster-shadow"></div>
+              <div class="fighter-figure-wrap monster-live-figure" id="monsterFigure">
+                <img
+                  id="monsterSpriteImg"
+                  src="assets/images/monster_boss_sprite.webp"
+                  alt="守關魔物立繪"
+                  onerror="handleSpriteFallback(this, 'monster')"
+                />
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 蓄力大絕招與題號狀態列 -->
+      <div class="battle-control-bar">
+        <div class="quest-progress-info">
+          <span class="category-chip" id="qCategoryChip">歷史事件</span>
+          <span id="qProgressText">討伐進度：第 1 / 16 題</span>
+        </div>
+
+        <button class="ultimate-btn" id="ultimateBtn" onclick="castUltimateSkill()" disabled>
+          <span>⚡ 必殺技：自由聖劍・民主破曉斬</span>
+          <span id="ultChargeLabel">(MP 0%)</span>
+        </button>
+      </div>
+
+      <!-- 答題戰鬥指令面板 -->
+      <div class="quiz-command-card">
+        <div class="question-prompt" id="questionPrompt">
+          載入討伐任務中...
+        </div>
+
+        <div class="options-grid" id="optionsGrid"></div>
+
+        <!-- 【名師解題秘笈】解析區 -->
+        <div class="explanation-box" id="explanationBox">
+          <div class="exp-header">
+            <span id="expTitle">📜 【大賢者名師解題秘笈】</span>
+            <span id="expRewardTag" style="font-size:0.85rem; color:#4ade80;"></span>
+          </div>
+          <div class="exp-body" id="expBody"></div>
+          <button class="next-btn" id="nextQuestionBtn" onclick="nextQuestion()">
+            繼續進擊 ➔
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== 視圖 2：冒險者公會大廳 (養成與章節選擇) ==================== -->
+    <section class="view-section" id="view-guild">
+      <div class="guild-hub-banner">
+        <div class="guild-hub-overlay"></div>
+        <div class="guild-hub-content">
+          <div class="guild-hero-profile">
+            <div class="guild-avatar-frame">
+              <img src="assets/images/hero_battle_sprite.webp" alt="勇者頭像" onerror="this.style.display='none'" />
+            </div>
+            <div>
+              <div style="font-size:0.82rem; color:var(--gold-light); font-weight:800;">🏰 王國冒險者公會・訓練總部</div>
+              <h2 style="font-size:1.35rem; margin:2px 0;" id="guildHeroTitle">見習冒險者・艾爾 (Lv.1)</h2>
+              <p style="font-size:0.86rem; color:#cbd5e1;" id="guildStatsSummary">
+                氣血上限 HP: 200 ｜ 聖劍攻擊 ATK: 85 ｜ 聖盾防禦 DEF: 15
+              </p>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="up-btn" onclick="startCampaign('all')">⚔️ 挑戰全戰役 (16題連戰)</button>
+            <button class="nav-btn" onclick="resetSaveData()" style="border-color:#ef4444; color:#fca5a5;">🗑️ 重置存檔</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="guild-grid">
+        <!-- 屬性強化工坊 -->
+        <div class="rpg-panel">
+          <div class="panel-title">
+            <span>⚒️ 聖光裝備與能力強化</span>
+            <span style="font-size:0.85rem; color:var(--gold-light);">持有金幣：<span id="guildGoldText">100</span> 🪙</span>
+          </div>
+
+          <div class="upgrade-item">
+            <div>
+              <div style="font-weight:800; color:#4ade80;">❤️ 生命聖水晶 (強化 HP 上限)</div>
+              <div style="font-size:0.8rem; color:#94a3b8;" id="upHpDesc">目前上限：200 HP（每級 +40 HP）</div>
+            </div>
+            <button class="up-btn" id="btnUpHp" onclick="upgradeStat('hp')">強化 (50 🪙)</button>
+          </div>
+
+          <div class="upgrade-item">
+            <div>
+              <div style="font-weight:800; color:#38bdf8;">🗡️ 自由聖劍研磨 (強化基礎 ATK)</div>
+              <div style="font-size:0.8rem; color:#94a3b8;" id="upAtkDesc">目前攻擊：85 ATK（每級 +18 ATK）</div>
+            </div>
+            <button class="up-btn" id="btnUpAtk" onclick="upgradeStat('atk')">強化 (50 🪙)</button>
+          </div>
+
+          <div class="upgrade-item">
+            <div>
+              <div style="font-weight:800; color:#f59e0b;">🛡️ 憲政紋章護盾 (強化減傷 DEF)</div>
+              <div style="font-size:0.8rem; color:#94a3b8;" id="upDefDesc">目前防禦：15 DEF（每級減少魔物傷害 8 點）</div>
+            </div>
+            <button class="up-btn" id="btnUpDef" onclick="upgradeStat('def')">強化 (50 🪙)</button>
+          </div>
+        </div>
+
+        <!-- 討伐戰役章節選擇 -->
+        <div class="rpg-panel">
+          <div class="panel-title">
+            <span>🗺️ 選擇討伐戰役章節</span>
+            <span style="font-size:0.8rem; color:#94a3b8;">點擊章節立即出征</span>
+          </div>
+
+          <div class="chapter-card" id="chapCard-0" onclick="startCampaign(0)">
+            <div>
+              <div style="font-weight:800; color:var(--gold-light);">第一章：破曉迷霧之森（戰後初期～二二八事件）</div>
+              <div style="font-size:0.8rem; color:#94a3b8;">課本 p.34–36｜臺灣光復、國共內戰物價飛漲、二二八事件</div>
+            </div>
+            <span class="category-chip">4 題討伐</span>
+          </div>
+
+          <div class="chapter-card" id="chapCard-1" onclick="startCampaign(1)">
+            <div>
+              <div style="font-weight:800; color:var(--gold-light);">第二章：戒嚴黑鐵地牢（戒嚴令～美麗島事件）</div>
+              <div style="font-size:0.8rem; color:#94a3b8;">課本 p.37–38｜民國38年戒嚴令、禁歌禁書、美麗島事件與解嚴</div>
+            </div>
+            <span class="category-chip">4 題討伐</span>
+          </div>
+
+          <div class="chapter-card" id="chapCard-2" onclick="startCampaign(2)">
+            <div>
+              <div style="font-weight:800; color:var(--gold-light);">第三章：野百合聖光平原（野百合～總統直選與公投）</div>
+              <div style="font-size:0.8rem; color:#94a3b8;">課本 p.39｜野百合學運、首次總統直選、政黨輪替、全國公投</div>
+            </div>
+            <span class="category-chip">4 題討伐</span>
+          </div>
+
+          <div class="chapter-card" id="chapCard-3" onclick="startCampaign(3)">
+            <div>
+              <div style="font-weight:800; color:var(--gold-light);">第四章：憲政王城聖殿（憲法、政府分工、權利義務）</div>
+              <div style="font-size:0.8rem; color:#94a3b8;">課本 p.40–45｜中華民國憲法、中央五院與地方、四大權利三大義務</div>
+            </div>
+            <span class="category-chip">4 題討伐</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 視圖 3：知識魔導書 (全題庫與觀念解析) ==================== -->
+    <section class="view-section" id="view-codex">
+      <div class="rpg-panel">
+        <div class="panel-title">
+          <span>📜 王國大賢者知識魔導書（戰後臺灣的民主發展・重點全覽）</span>
+          <span style="font-size:0.82rem; color:#94a3b8;">共收錄 16 道核心素養考題與詳解</span>
+        </div>
+        <div class="codex-list" id="codexList"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 戰役結算 Modal -->
+  <div class="modal-backdrop" id="resultModal">
+    <div class="modal-card">
+      <div style="font-size:2.6rem;" id="modalIcon">🏆</div>
+      <h2 style="color:var(--gold-light); font-size:1.45rem;" id="modalTitle">討伐成功！民主曙光降臨！</h2>
+      <p style="color:#cbd5e1; font-size:0.95rem; line-height:1.6;" id="modalDesc"></p>
+      <div style="display:flex; gap:10px; justify-content:center; margin-top:8px; flex-wrap:wrap;">
+        <button class="next-btn" onclick="closeModalAndRestart()">⚔️ 再次挑戰</button>
+        <button class="nav-btn" onclick="closeModalToGuild()" style="padding:9px 18px;">🏰 前往冒險者公會強化</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* =====================================================
+       模組四：原生免外部音檔音效 (Web Audio API)
+       ===================================================== */
+    const AudioFX = {
+      ctx: null,
+      muted: false,
+      init() {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+      },
+      hit() {
+        if (this.muted) return;
+        this.init();
+        const t = this.ctx.currentTime, osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(180, t);
+        osc.frequency.exponentialRampToValueAtTime(30, t + 0.16);
+        g.gain.setValueAtTime(0.45, t);
+        g.gain.linearRampToValueAtTime(0.01, t + 0.16);
+        osc.connect(g); g.connect(this.ctx.destination);
+        osc.start(); osc.stop(t + 0.17);
+      },
+      correct() {
+        if (this.muted) return;
+        this.init();
+        const t = this.ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+          const osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f, t + i * 0.06);
+          g.gain.setValueAtTime(0.18, t + i * 0.06);
+          g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.06 + 0.2);
+          osc.connect(g); g.connect(this.ctx.destination);
+          osc.start(t + i * 0.06); osc.stop(t + i * 0.06 + 0.22);
+        });
+      },
+      wrong() {
+        if (this.muted) return;
+        this.init();
+        const t = this.ctx.currentTime, osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, t);
+        osc.frequency.linearRampToValueAtTime(80, t + 0.25);
+        g.gain.setValueAtTime(0.3, t);
+        g.gain.linearRampToValueAtTime(0.01, t + 0.25);
+        osc.connect(g); g.connect(this.ctx.destination);
+        osc.start(); osc.stop(t + 0.26);
+      },
+      burst() {
+        if (this.muted) return;
+        this.init();
+        const t = this.ctx.currentTime;
+        [220, 330, 440, 660, 880].forEach((f, i) => {
+          const osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(f, t + i * 0.05);
+          osc.frequency.exponentialRampToValueAtTime(f * 2, t + i * 0.05 + 0.25);
+          g.gain.setValueAtTime(0.2, t + i * 0.05);
+          g.gain.linearRampToValueAtTime(0.01, t + i * 0.05 + 0.28);
+          osc.connect(g); g.connect(this.ctx.destination);
+          osc.start(t + i * 0.05); osc.stop(t + i * 0.05 + 0.3);
+        });
+      }
+    };
+
+    function toggleMute() {
+      AudioFX.muted = !AudioFX.muted;
+      document.getElementById('soundToggleBtn').textContent = AudioFX.muted ? '🔇' : '🔊';
+    }
+
+    /* =====================================================
+       破圖防禦機制 (Graceful Fallback)：若 .webp 未載入先試 .png，再兜底精緻 SVG
+       ===================================================== */
+    function handleSpriteFallback(imgEl, role) {
+      if (!imgEl.dataset.triedPng) {
+        imgEl.dataset.triedPng = 'true';
+        imgEl.src = role === 'hero'
+          ? 'assets/images/hero_battle_sprite.png'
+          : 'assets/images/monster_boss_sprite.png';
+        return;
+      }
+      const parent = imgEl.parentElement;
+      if (!parent) return;
+      if (role === 'hero') {
+        parent.innerHTML = `
+          <svg class="fallback-svg" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="cape" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1e3a8a"/></linearGradient>
+              <linearGradient id="blade" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#e0f2fe"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient>
+            </defs>
+            <path d="M55 75 L25 190 L95 180 Z" fill="url(#cape)" />
+            <rect x="72" y="135" width="20" height="55" rx="8" fill="#1e293b"/>
+            <rect x="102" y="135" width="20" height="55" rx="8" fill="#1e293b"/>
+            <rect x="65" y="75" width="65" height="68" rx="14" fill="#3b82f6" stroke="#fbbf24" stroke-width="4"/>
+            <circle cx="98" cy="48" r="26" fill="#fde68a" stroke="#f59e0b" stroke-width="3"/>
+            <path d="M72 35 L98 12 L125 35 Z" fill="#f59e0b"/>
+            <polygon points="145,25 160,20 135,115 122,110" fill="url(#blade)" stroke="#fef08a" stroke-width="2"/>
+            <rect x="42" y="85" width="36" height="48" rx="10" fill="#f59e0b" stroke="#fef08a" stroke-width="3"/>
+          </svg>`;
+      } else {
+        parent.innerHTML = `
+          <svg class="fallback-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+            <path d="M110 40 L195 15 L170 110 Z" fill="#581c87" stroke="#ef4444" stroke-width="3"/>
+            <path d="M110 40 L25 20 L55 110 Z" fill="#581c87" stroke="#ef4444" stroke-width="3"/>
+            <ellipse cx="110" cy="125" rx="55" ry="62" fill="#1f2937" stroke="#a855f7" stroke-width="4"/>
+            <circle cx="90" cy="72" r="7" fill="#ef4444"/>
+            <circle cx="122" cy="72" r="7" fill="#ef4444"/>
+            <path d="M75 45 L60 15 L92 40 Z" fill="#dc2626"/>
+            <path d="M145 45 L160 15 L128 40 Z" fill="#dc2626"/>
+          </svg>`;
+      }
+    }
+
+    /* =====================================================
+       5. 題庫格式規範 (QUESTION_BANK) - 完整對應課本第 34～45 頁
+       ===================================================== */
+    const QUESTION_BANK = [
+      // 第一章：破曉迷霧之森（戰後初期與二二八事件，課本 p.34-36）➔ 答案分佈：C, A, D, B
+      {
+        chapter: 0,
+        category: "戰後初期與光復",
+        prompt: "民國 34 年（西元 1945 年）第二次世界大戰結束，日本戰敗後，臺灣與澎湖由哪一個政權接管，結束了日本殖民統治？",
+        options: [
+          "清帝國",
+          "荷蘭東印度公司",
+          "中華民國",
+          "美利堅合眾國"
+        ],
+        answerIndex: 2,
+        explanation: "民國 34 年（1945 年）日本在二戰戰敗，中華民國接管臺灣與澎湖，臺灣人民脫離日本殖民的不平等對待，對自由平等的新生活充滿期待（課本 p.34）。"
+      },
+      {
+        chapter: 0,
+        category: "戰後初期社會矛盾",
+        prompt: "戰後初期，臺灣社會為什麼會出現「物價飛漲、民怨累積」的困境？下列哪一項是當時的主要原因？",
+        options: [
+          "政府將臺灣的糧食與資源運往中國大陸支應「國共內戰」，加上部分官員貪汙濫權",
+          "因為全臺灣都在舉辦嘉年華會，大家把米糧都拿去釀汽水了",
+          "日本總督府還在臺灣繼續實施米糖相剋政策",
+          "因為當時臺灣發現超大金礦，每個人的黃金多到花不完"
+        ],
+        answerIndex: 0,
+        explanation: "戰後初期臺灣社會尚未復原，加上中國大陸爆發「國共內戰」，政府將臺灣糧食與資源運往大陸支應戰事導致物價飛漲，且語言文化差異與官員貪汙使社會矛盾加劇（課本 p.35）。"
+      },
+      {
+        chapter: 0,
+        category: "二二八事件",
+        prompt: "民國 36 年，臺灣社會因物價飛漲與官員貪汙累積不滿，最後因為什麼導火線引爆全臺嚴重衝突，史稱「二二八事件」？",
+        options: [
+          "噍吧哖武裝抗日事件",
+          "美麗島雜誌社在高雄舉辦國際人權日遊行",
+          "大學生在中正紀念堂靜坐要求總統直選",
+          "專賣局人員查緝私菸處理失當，打傷菸販並誤殺路人"
+        ],
+        answerIndex: 3,
+        explanation: "民國 36 年 2 月 27 日，專賣局人員查緝私菸時打傷菸販並誤殺路人，隔日（2月28日）民眾遊行抗議演變為全臺衝突，政府派軍隊鎮壓造成許多傷亡，史稱「二二八事件」（課本 p.36）。"
+      },
+      {
+        chapter: 0,
+        category: "二二八事件的影響",
+        prompt: "在民國 36 年「二二八事件」抗議擴大時，民眾曾占領哪一個機構向全島告知事件經過？而政府派軍鎮壓後對臺灣社會造成什麼影響？",
+        options: [
+          "占領臺北101大樓；事件後大家立刻開始直接投票選總統",
+          "占領臺灣廣播電台；事件後人民對統治者感到失望，也加深了族群間的隔閡",
+          "占領高雄港海關；事件後政府宣布全國免稅十年",
+          "占領阿里山林場；事件後全面開放報禁與黨禁"
+        ],
+        answerIndex: 1,
+        explanation: "抗議民眾當時占領「臺灣廣播電台」向全島廣播，使衝突擴大至各地；政府派軍隊強制鎮壓數月，造成許多民眾傷亡，也加深了族群間的隔閡（課本 p.36）。"
+      },
+
+      // 第二章：戒嚴黑鐵地牢（戒嚴時期與美麗島事件、解嚴，課本 p.37-38）➔ 答案分佈：B, D, C, A
+      {
+        chapter: 1,
+        category: "戒嚴對人民的影響",
+        prompt: "穿越回民國 45 年的臺灣！當時政府自民國 38 年起實施「戒嚴令」，如果你是當時的民眾，在日常生活中會遇到下列哪一種情況？",
+        options: [
+          "每個人都可以自由創辦新政黨，還能直接投票選總統",
+          "言論、出版、集會與結社自由受嚴格限制，連歌曲和書籍都會被審查查禁",
+          "隨時可以出版批評政府的雜誌，完全不會受到任何限制",
+          "出國旅遊完全不用申請檢查，也沒有宵禁或集會管制"
+        ],
+        answerIndex: 1,
+        explanation: "民國 38 年政府為控制社會秩序、防止共產黨滲透而實施戒嚴，人民的言論、出版、集會、結社及出國等基本權利都被嚴格限制與審查（課本 p.37）。"
+      },
+      {
+        chapter: 1,
+        category: "兩岸關係與戒嚴背景",
+        prompt: "民國 38 年底，中華民國政府在「國共內戰」中失利並撤退到臺灣，當時海峽兩岸陷入什麼樣的局面？",
+        options: [
+          "兩岸立刻簽署和平條約，開放每天直航觀光",
+          "清帝國重新回到臺灣建立臺灣民主國",
+          "日本總督府再度派警察來管理保甲制度",
+          "兩岸陷入長期軍事對峙的局面，政府也持續以戒嚴令嚴格管制社會"
+        ],
+        answerIndex: 3,
+        explanation: "民國 38 年底中華民國政府在國共內戰失利撤退來臺，同時間中華人民共和國在大陸成立，兩岸自此陷入長期軍事對峙的局面（課本 p.34、37）。"
+      },
+      {
+        chapter: 1,
+        category: "美麗島事件",
+        prompt: "戒嚴時期雖然法律嚴苛，許多人仍嘗試透過出版雜誌、集會遊行推動民主。民國 68 年為爭取開放報禁、黨禁及解除戒嚴而發生的重大衝突是？",
+        options: [
+          "二二八事件",
+          "野百合學運",
+          "美麗島事件",
+          "霧社事件"
+        ],
+        answerIndex: 2,
+        explanation: "民國 68 年《美麗島》雜誌社在國際人權日舉辦集會遊行，爭取開放報禁、黨禁及解除戒嚴，許多參與者遭逮捕判刑，引起國際關注並喚起更多民眾要求改革（課本 p.38）。"
+      },
+      {
+        chapter: 1,
+        category: "解除戒嚴",
+        prompt: "隨著民意高漲，政府終於在「民國 76 年」宣布哪一件歷史大事，使人民基本權利逐步恢復，電臺、報社及新政黨也陸續成立？",
+        options: [
+          "宣布「解除戒嚴」",
+          "宣布「實施專賣制度」",
+          "宣布「舉辦首次全國性公投」",
+          "宣布「廢除中華民國憲法」"
+        ],
+        answerIndex: 0,
+        explanation: "民國 76 年（1987 年）政府宣布「解除戒嚴」，陸續廢除對人民基本權利的限制，報社、電臺與新政黨陸續成立，臺灣邁向開放的民主社會（課本 p.38）。"
+      },
+
+      // 第三章：野百合聖光平原（野百合、總統直選、政黨輪替、公投，課本 p.39）➔ 答案分佈：D, B, A, C
+      {
+        chapter: 2,
+        category: "野百合學運",
+        prompt: "民國 79 年，全臺各地大學生集結在中正紀念堂靜坐抗議，要求政府落實憲法制度、促成總統直接民選等政治改革。這場運動稱為？",
+        options: [
+          "太陽花學運",
+          "美麗島運動",
+          "臺灣議會設置請願運動",
+          "野百合學運"
+        ],
+        answerIndex: 3,
+        explanation: "民國 79 年發生「野百合學運」，全臺大學生在中正紀念堂靜坐抗議，要求政府落實憲法制度，促成了後來總統直接民選等重要政治改革（課本 p.39）。"
+      },
+      {
+        chapter: 2,
+        category: "民主里程碑配對",
+        prompt: "臺灣民主里程碑挑戰！關於解嚴後的民主發展大事，下列哪一個「年份與歷史意義」的配對完全正確？",
+        options: [
+          "民國 79 年「野百合學運」➔ 大學生靜坐抗議，要求每週多放三天暑假",
+          "民國 85 年「首次總統直選」➔ 臺灣人民第一次能直接投票選出總統",
+          "民國 89 年「首次政黨輪替」➔ 雙方政黨靠拔河比賽決定誰當總統",
+          "民國 93 年「首次全國公投」➔ 全民投票決定學校營養午餐不准加青椒"
+        ],
+        answerIndex: 1,
+        explanation: "民國 85 年（1996 年）臺灣人民第一次能夠直接投票選出總統，是臺灣民主制度的重要里程碑（課本 p.39）。"
+      },
+      {
+        chapter: 2,
+        category: "政黨輪替與公投",
+        prompt: "民國 89 年臺灣歷經首次「政黨輪替」，民國 93 年舉辦首次「全國性公民投票」。這兩件大事分別代表什麼民主意義？",
+        options: [
+          "政黨輪替代表以選舉方式和平完成政權轉移；公民投票則是人民針對重大公共議題直接表達意見",
+          "政黨輪替代表從此不用再辦選舉；公民投票則是只有政府官員才能去投票",
+          "政黨輪替代表廢除立法院；公民投票則是決定誰去服兵役",
+          "這兩件事都發生在戒嚴時期，人民還沒有言論自由"
+        ],
+        answerIndex: 0,
+        explanation: "民國 89 年首次政黨輪替，以和平選舉方式完成政權轉移；民國 93 年首次全國性公投，讓人民能針對重大公共議題表達意見，提供政府施政參考（課本 p.39）。"
+      },
+      {
+        chapter: 2,
+        category: "戰後民主歷程統整",
+        prompt: "阿公回憶他的一生：①幼年聽聞二二八事件 ②青年時因戒嚴不敢隨便談政治 ③中年見證解嚴與野百合學運 ④後來親自投票選總統。這說明什麼？",
+        options: [
+          "臺灣的民主與自由是從天上掉下來的禮物，完全不需要任何人努力",
+          "戒嚴時期人民享有的言論與參政自由，比解嚴之後還要多更多",
+          "臺灣社會歷經多年努力，從威權戒嚴逐步走向開放，人民得以多元參與公共事務",
+          "臺灣從民國 34 年光復第一天起，就可以直接投票選總統與舉辦公投"
+        ],
+        answerIndex: 2,
+        explanation: "歷經多年的努力，臺灣從二二八事件與戒嚴限制中逐步走向解嚴、總統直選與公投，展現主權在民與多元參與的民主價值（課本 p.36–39）。"
+      },
+
+      // 第四章：憲政王城聖殿（憲法、政府分工、權利與義務，課本 p.40-45）➔ 答案分佈：B, C, D, A
+      {
+        chapter: 3,
+        category: "國家根本大法",
+        prompt: "我國有一部於民國 36 年施行的「國家根本大法」，規範國家重要制度、保障人民基本權利，且所有法律都不能違反它。請問它是？",
+        options: [
+          "《馬關條約》",
+          "《中華民國憲法》",
+          "《學校衛生法》",
+          "《臺灣省戒嚴令》"
+        ],
+        answerIndex: 1,
+        explanation: "《中華民國憲法》於民國 36 年施行，是國家的「根本大法」，所有法律都必須依據憲法制定且不得違反憲法規定（課本 p.40–41）。"
+      },
+      {
+        chapter: 3,
+        category: "中央政府五院分工",
+        prompt: "中央政府分成五院守護學童營養午餐！若要「制定《學校衛生法》並審查預算」與「執行法律、訂定食品安全政策」，分別由哪兩院負責？",
+        options: [
+          "制定法律與審預算是「行政院」；執行法律與推政策是「立法院」",
+          "全部都由「考試院」院長親自到學校廚房煮營養午餐",
+          "制定法律與審預算是「立法院」；執行法律與推政策是「行政院」",
+          "由「司法院」負責買菜、「監察院」負責訂定全國食安標準"
+        ],
+        answerIndex: 2,
+        explanation: "中央政府五院分工合作：「立法院」負責制定法律（如學校衛生法）與審查預算；「行政院」負責執行法律與推動政策（如訂定食安標準）（課本 p.42）。"
+      },
+      {
+        chapter: 3,
+        category: "地方政府權責",
+        prompt: "地方政府也分「行政機關」與「立法機關」互相分工監督！關於地方政府落實營養午餐的配對，下列哪一項最正確？",
+        options: [
+          "縣市政府（行政機關）負責審核預算；縣市議會（立法機關）負責執行政策",
+          "鄉鎮市區公所屬於「立法機關」，專門負責制定全國憲法",
+          "全臺灣每個縣市的經濟財政條件都一模一樣，地方制度完全沒有差別",
+          "縣市首長（行政機關）視察業者食材；縣市議會（立法機關）審核預算與監督品質"
+        ],
+        answerIndex: 3,
+        explanation: "地方行政機關（直轄市/縣市政府、鄉鎮市區公所）負責執行政策與建設；地方立法機關（縣市議會、代表會）負責制定地方法規、審核預算與監督地方政府（課本 p.43）。"
+      },
+      {
+        chapter: 3,
+        category: "人民的權利與義務",
+        prompt: "憲法保障人民「平等、自由、參政、受益」四大基本權利，並規定「納稅、服兵役、受國民教育」三大基本義務。其中哪一項「既是基本權利，也是基本義務」？",
+        options: [
+          "接受國民教育（屬於基本權利中的「受益權」，同時也是基本義務）",
+          "納稅（繳稅給政府興建公共建設與推動社會福利）",
+          "服兵役（年滿 18 歲男子除特殊狀況外須服兵役）",
+          "投票選市長與考公職（屬於基本權利中的「參政權」）"
+        ],
+        answerIndex: 0,
+        explanation: "憲法明定人民有納稅、服兵役、受國民教育三大義務；其中「接受國民教育」能保障生存發展（受益權）並提升國家競爭力，因此在憲法上兼具權利與義務雙重性質（課本 p.44–45）。"
+      }
+    ];
+
+    /* 章節魔物配置 */
+    const CHAPTER_BOSSES = {
+      all: {
+        title: "全戰役連戰：解放戰後民主之路 (16題)",
+        monsterName: "🐲 闇鐵鎖鏈魔龍王",
+        monsterLv: "終極 BOSS",
+        maxHp: 680
+      },
+      0: {
+        title: "第一章：破曉迷霧之森（戰後初期～二二八事件）",
+        monsterName: "🐺 迷霧闇影魔狼",
+        monsterLv: "Lv.3 守關者",
+        maxHp: 260
+      },
+      1: {
+        title: "第二章：戒嚴黑鐵地牢（戒嚴令～美麗島與解嚴）",
+        monsterName: "⛓️ 戒嚴黑鐵魔龍",
+        monsterLv: "Lv.6 守關者",
+        maxHp: 300
+      },
+      2: {
+        title: "第三章：野百合聖光平原（野百合～總統直選與公投）",
+        monsterName: "🗿 舊制混沌巨像",
+        monsterLv: "Lv.9 守關者",
+        maxHp: 340
+      },
+      3: {
+        title: "第四章：憲政王城聖殿（憲法、政府分工、權利義務）",
+        monsterName: "🐲 闇鐵鎖鏈魔龍王",
+        monsterLv: "Lv.12 終極魔王",
+        maxHp: 380
+      }
+    };
+
+    const RANK_TITLES = [
+      { minWins: 0, title: "見習冒險者 (銅級)" },
+      { minWins: 4, title: "王國遊俠 (銀級)" },
+      { minWins: 8, title: "聖光騎士 (黃金級)" },
+      { minWins: 12, title: "自由聖劍勇者 (白金級)" },
+      { minWins: 16, title: "傳說民主守護神 (鑽石級)" }
+    ];
+
+    /* =====================================================
+       玩家養成存檔與戰鬥狀態管理 (localStorage)
+       ===================================================== */
+    const SAVE_KEY = 'rpg_postwar_democracy_save_v1';
+
+    let playerSave = {
+      gold: 100,
+      totalWins: 0,
+      hpLv: 1,
+      atkLv: 1,
+      defLv: 1,
+      clearedChapters: []
+    };
+
+    let battleState = {
+      mode: 'all',
+      queue: [],
+      currentIndex: 0,
+      heroHp: 200,
+      heroMaxHp: 200,
+      heroMp: 0,
+      monsterHp: 680,
+      monsterMaxHp: 680,
+      combo: 0,
+      correctCount: 0,
+      answered: false
+    };
+
+    function loadSave() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          playerSave = { ...playerSave, ...parsed };
+        }
+      } catch (e) {
+        console.warn('讀取存檔失敗，使用預設值', e);
+      }
+      updateHudAndGuildUI();
+    }
+
+    function saveProgress() {
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(playerSave));
+      } catch (e) {}
+      updateHudAndGuildUI();
+    }
+
+    function getHeroMaxHp() {
+      return 200 + (playerSave.hpLv - 1) * 40;
+    }
+
+    function getHeroAtk() {
+      return 85 + (playerSave.atkLv - 1) * 18;
+    }
+
+    function getHeroDef() {
+      return 15 + (playerSave.defLv - 1) * 8;
+    }
+
+    function getRankTitle() {
+      let current = RANK_TITLES[0].title;
+      for (const r of RANK_TITLES) {
+        if (playerSave.totalWins >= r.minWins) current = r.title;
+      }
+      return current;
+    }
+
+    function getTotalLevel() {
+      return playerSave.hpLv + playerSave.atkLv + playerSave.defLv - 2;
+    }
+
+    function updateHudAndGuildUI() {
+      const rank = getRankTitle();
+      const lv = getTotalLevel();
+      document.getElementById('hudRankTitle').textContent = rank;
+      document.getElementById('hudGold').textContent = playerSave.gold;
+      document.getElementById('hudWins').textContent = playerSave.totalWins;
+      document.getElementById('heroLvTag').textContent = `Lv.${lv}`;
+
+      // 更新冒險者公會面板
+      document.getElementById('guildHeroTitle').textContent = `${rank}・艾爾 (Lv.${lv})`;
+      document.getElementById('guildStatsSummary').textContent =
+        `氣血上限 HP: ${getHeroMaxHp()} ｜ 聖劍攻擊 ATK: ${getHeroAtk()} ｜ 聖盾防禦 DEF: ${getHeroDef()}`;
+      document.getElementById('guildGoldText').textContent = playerSave.gold;
+
+      const hpCost = playerSave.hpLv * 50;
+      const atkCost = playerSave.atkLv * 50;
+      const defCost = playerSave.defLv * 50;
+
+      document.getElementById('upHpDesc').textContent = `Lv.${playerSave.hpLv} ➔ 目前上限：${getHeroMaxHp()} HP（升級 +40 HP）`;
+      document.getElementById('upAtkDesc').textContent = `Lv.${playerSave.atkLv} ➔ 目前攻擊：${getHeroAtk()} ATK（升級 +18 ATK）`;
+      document.getElementById('upDefDesc').textContent = `Lv.${playerSave.defLv} ➔ 目前防禦：${getHeroDef()} DEF（升級減傷 +8）`;
+
+      const btnHp = document.getElementById('btnUpHp');
+      const btnAtk = document.getElementById('btnUpAtk');
+      const btnDef = document.getElementById('btnUpDef');
+
+      btnHp.textContent = `強化 (${hpCost} 🪙)`;
+      btnAtk.textContent = `強化 (${atkCost} 🪙)`;
+      btnDef.textContent = `強化 (${defCost} 🪙)`;
+
+      btnHp.disabled = playerSave.gold < hpCost;
+      btnAtk.disabled = playerSave.gold < atkCost;
+      btnDef.disabled = playerSave.gold < defCost;
+
+      for (let c = 0; c < 4; c++) {
+        const card = document.getElementById(`chapCard-${c}`);
+        if (card) {
+          card.classList.toggle('cleared', playerSave.clearedChapters.includes(c));
+        }
+      }
+    }
+
+    function upgradeStat(type) {
+      const cost = playerSave[type + 'Lv'] * 50;
+      if (playerSave.gold < cost) return;
+      playerSave.gold -= cost;
+      playerSave[type + 'Lv'] += 1;
+      AudioFX.correct();
+      saveProgress();
+
+      // 同步提升當前戰場生命上限
+      if (type === 'hp') {
+        battleState.heroMaxHp = getHeroMaxHp();
+        battleState.heroHp = Math.min(battleState.heroMaxHp, battleState.heroHp + 40);
+        updateBattleBars();
+      }
+    }
+
+    function resetSaveData() {
+      if (!confirm('確定要重置所有勇者等級、金幣與通關紀錄嗎？')) return;
+      localStorage.removeItem(SAVE_KEY);
+      playerSave = { gold: 100, totalWins: 0, hpLv: 1, atkLv: 1, defLv: 1, clearedChapters: [] };
+      saveProgress();
+      startCampaign('all');
+    }
+
+    /* =====================================================
+       視圖切換與戰役啟動
+       ===================================================== */
+    function switchView(viewName) {
+      document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+      document.getElementById(`view-${viewName}`).classList.add('active');
+
+      document.getElementById('tabBattleBtn').classList.toggle('active', viewName === 'battle');
+      document.getElementById('tabGuildBtn').classList.toggle('active', viewName === 'guild');
+      document.getElementById('tabCodexBtn').classList.toggle('active', viewName === 'codex');
+    }
+
+    function startCampaign(chapterMode) {
+      const bossCfg = CHAPTER_BOSSES[chapterMode] || CHAPTER_BOSSES.all;
+      const filtered = chapterMode === 'all'
+        ? [...QUESTION_BANK]
+        : QUESTION_BANK.filter(q => q.chapter === chapterMode);
+
+      battleState.mode = chapterMode;
+      battleState.queue = filtered;
+      battleState.currentIndex = 0;
+      battleState.heroMaxHp = getHeroMaxHp();
+      battleState.heroHp = battleState.heroMaxHp;
+      battleState.heroMp = 0;
+      battleState.monsterMaxHp = bossCfg.maxHp;
+      battleState.monsterHp = bossCfg.maxHp;
+      battleState.combo = 0;
+      battleState.correctCount = 0;
+      battleState.answered = false;
+
+      document.getElementById('stageChapterTag').textContent = bossCfg.title;
+      document.getElementById('monsterNameLabel').textContent = bossCfg.monsterName;
+      document.getElementById('monsterLvTag').textContent = bossCfg.monsterLv;
+
+      updateBattleBars();
+      updateComboUI();
+      renderCurrentQuestion();
+      switchView('battle');
+    }
+
+    function renderCurrentQuestion() {
+      const q = battleState.queue[battleState.currentIndex];
+      if (!q) return;
+
+      battleState.answered = false;
+      document.getElementById('qCategoryChip').textContent = q.category;
+      document.getElementById('qProgressText').textContent =
+        `討伐進度：第 ${battleState.currentIndex + 1} / ${battleState.queue.length} 題`;
+      document.getElementById('questionPrompt').textContent = q.prompt;
+
+      const expBox = document.getElementById('explanationBox');
+      expBox.classList.remove('show');
+
+      const grid = document.getElementById('optionsGrid');
+      grid.innerHTML = '';
+      const keys = ['A', 'B', 'C', 'D'];
+
+      q.options.forEach((optText, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        btn.innerHTML = `<span class="opt-key">${keys[idx]}</span><span>${optText}</span>`;
+        btn.onclick = () => selectAnswer(idx);
+        grid.appendChild(btn);
+      });
+    }
+
+    /* =====================================================
+       答題判定、動態打擊演出與跳字
+       ===================================================== */
+    function spawnFloatingText(standeeId, text, styleClass) {
+      const container = document.getElementById(standeeId);
+      const el = document.createElement('div');
+      el.className = `floating-dmg ${styleClass}`;
+      el.textContent = text;
+      container.appendChild(el);
+      setTimeout(() => el.remove(), 1000);
+    }
+
+    function triggerFigureAnim(figureId, animClass, duration = 550) {
+      const el = document.getElementById(figureId);
+      el.classList.remove('anim-hero-slash', 'anim-monster-slash', 'anim-hurt-impact', 'anim-monster-hurt', 'anim-cast-ultimate');
+      void el.offsetWidth; // 強制 reflow
+      el.classList.add(animClass);
+      setTimeout(() => {
+        el.classList.remove(animClass);
+      }, duration);
+    }
+
+    function shakeStage() {
+      const stage = document.getElementById('battleStageWrapper');
+      stage.classList.remove('screen-shake');
+      void stage.offsetWidth;
+      stage.classList.add('screen-shake');
+    }
+
+    function updateBattleBars() {
+      const heroPct = Math.max(0, Math.round((battleState.heroHp / battleState.heroMaxHp) * 100));
+      const monsterPct = Math.max(0, Math.round((battleState.monsterHp / battleState.monsterMaxHp) * 100));
+
+      document.getElementById('heroHpBar').style.width = `${heroPct}%`;
+      document.getElementById('heroHpText').textContent = `HP ${battleState.heroHp}/${battleState.heroMaxHp}`;
+      document.getElementById('heroMpBar').style.width = `${battleState.heroMp}%`;
+      document.getElementById('heroMpText').textContent = `MP ${battleState.heroMp}%`;
+
+      document.getElementById('monsterHpBar').style.width = `${monsterPct}%`;
+      document.getElementById('monsterHpText').textContent = `HP ${battleState.monsterHp}/${battleState.monsterMaxHp}`;
+      document.getElementById('monsterPercentText').textContent = `${monsterPct}%`;
+
+      const ultBtn = document.getElementById('ultimateBtn');
+      const ultLabel = document.getElementById('ultChargeLabel');
+      ultLabel.textContent = `(MP ${battleState.heroMp}%)`;
+      if (battleState.heroMp >= 100) {
+        ultBtn.disabled = false;
+        ultBtn.classList.add('ready');
+      } else {
+        ultBtn.disabled = true;
+        ultBtn.classList.remove('ready');
+      }
+    }
+
+    function updateComboUI() {
+      const badge = document.getElementById('comboBadge');
+      if (battleState.combo >= 2) {
+        badge.textContent = `🔥 ${battleState.combo} COMBO 連擊加成！`;
+        badge.classList.add('show');
+      } else {
+        badge.classList.remove('show');
+      }
+    }
+
+    function selectAnswer(selectedIdx) {
+      if (battleState.answered) return;
+      battleState.answered = true;
+
+      const q = battleState.queue[battleState.currentIndex];
+      const isCorrect = selectedIdx === q.answerIndex;
+      const optionBtns = document.querySelectorAll('.option-btn');
+
+      optionBtns.forEach((btn, idx) => {
+        btn.disabled = true;
+        if (idx === q.answerIndex) btn.classList.add('correct-choice');
+        if (idx === selectedIdx && !isCorrect) btn.classList.add('wrong-choice');
+      });
+
+      const expBox = document.getElementById('explanationBox');
+      const expTitle = document.getElementById('expTitle');
+      const expRewardTag = document.getElementById('expRewardTag');
+      const expBody = document.getElementById('expBody');
+
+      if (isCorrect) {
+        // 答對：勇者揮劍突進斬擊
+        battleState.combo += 1;
+        battleState.correctCount += 1;
+        battleState.heroMp = Math.min(100, battleState.heroMp + 35);
+
+        const comboBonus = Math.min(40, (battleState.combo - 1) * 10);
+        const dmg = getHeroAtk() + comboBonus;
+        battleState.monsterHp = Math.max(0, battleState.monsterHp - dmg);
+
+        const goldEarned = 25 + battleState.combo * 5;
+        playerSave.gold += goldEarned;
+        playerSave.totalWins += 1;
+        saveProgress();
+
+        AudioFX.correct();
+        setTimeout(() => AudioFX.hit(), 180);
+
+        triggerFigureAnim('heroFigure', 'anim-hero-slash', 520);
+        setTimeout(() => {
+          triggerFigureAnim('monsterFigure', 'anim-monster-hurt', 500);
+          shakeStage();
+          spawnFloatingText(
+            'monsterStandee',
+            battleState.combo >= 3 ? `💥 -${dmg} 暴擊！` : `⚔️ -${dmg}`,
+            battleState.combo >= 3 ? 'crit' : 'normal'
+          );
+          updateBattleBars();
+          updateComboUI();
+        }, 210);
+
+        expTitle.textContent = '✨ 【精準命中！聖劍斬擊成功】';
+        expTitle.style.color = '#4ade80';
+        expRewardTag.textContent = `+${goldEarned} 🪙 金幣 ｜ MP +35%`;
+        expBody.innerHTML = `<strong>觀念鞏固：</strong>${q.explanation}`;
+        expBox.classList.add('show');
+      } else {
+        // 答錯：怪獸撲擊反噬，展開【名師解題秘笈】
+        battleState.combo = 0;
+        const rawEnemyAtk = 55;
+        const hurtDmg = Math.max(15, rawEnemyAtk - getHeroDef());
+        battleState.heroHp = Math.max(0, battleState.heroHp - hurtDmg);
+
+        AudioFX.wrong();
+        setTimeout(() => AudioFX.hit(), 180);
+
+        triggerFigureAnim('monsterFigure', 'anim-monster-slash', 520);
+        setTimeout(() => {
+          triggerFigureAnim('heroFigure', 'anim-hurt-impact', 500);
+          shakeStage();
+          spawnFloatingText('heroStandee', `💥 -${hurtDmg}`, 'hurt');
+          updateBattleBars();
+          updateComboUI();
+        }, 210);
+
+        expTitle.textContent = '📜 【名師解題秘笈・大賢者守護指引】';
+        expTitle.style.color = '#fde68a';
+        expRewardTag.textContent = `正確答案：${['A', 'B', 'C', 'D'][q.answerIndex]}`;
+        expBody.innerHTML = `<strong>為什麼選（${['A', 'B', 'C', 'D'][q.answerIndex]}）？</strong><br>${q.explanation}`;
+        expBox.classList.add('show');
+      }
+    }
+
+    /* =====================================================
+       施放滿能量大招 (Ultimate Skill)
+       ===================================================== */
+    function castUltimateSkill() {
+      if (battleState.heroMp < 100) return;
+      battleState.heroMp = 0;
+
+      const ultDmg = Math.round(getHeroAtk() * 2.8);
+      const healHp = Math.round(battleState.heroMaxHp * 0.35);
+
+      battleState.monsterHp = Math.max(0, battleState.monsterHp - ultDmg);
+      battleState.heroHp = Math.min(battleState.heroMaxHp, battleState.heroHp + healHp);
+
+      AudioFX.burst();
+      triggerFigureAnim('heroFigure', 'anim-cast-ultimate', 900);
+
+      const flashEl = document.getElementById('ultFlashOverlay');
+      flashEl.classList.remove('flash');
+      void flashEl.offsetWidth;
+      flashEl.classList.add('flash');
+
+      setTimeout(() => {
+        triggerFigureAnim('monsterFigure', 'anim-monster-hurt', 600);
+        shakeStage();
+        spawnFloatingText('monsterStandee', `⚡ 破曉聖劍 -${ultDmg}！`, 'crit');
+        spawnFloatingText('heroStandee', `💚 聖光回復 +${healHp}`, 'heal');
+        updateBattleBars();
+      }, 360);
+    }
+
+    /* =====================================================
+       推進下一題與戰役結算
+       ===================================================== */
+    function nextQuestion() {
+      if (battleState.heroHp <= 0) {
+        showResultModal(false);
+        return;
+      }
+      if (battleState.currentIndex + 1 >= battleState.queue.length) {
+        showResultModal(true);
+        return;
+      }
+      battleState.currentIndex += 1;
+      renderCurrentQuestion();
+    }
+
+    function showResultModal(isVictory) {
+      const modal = document.getElementById('resultModal');
+      const icon = document.getElementById('modalIcon');
+      const title = document.getElementById('modalTitle');
+      const desc = document.getElementById('modalDesc');
+
+      if (isVictory) {
+        const clearBonus = 80;
+        playerSave.gold += clearBonus;
+        if (typeof battleState.mode === 'number' && !playerSave.clearedChapters.includes(battleState.mode)) {
+          playerSave.clearedChapters.push(battleState.mode);
+        }
+        saveProgress();
+        AudioFX.correct();
+
+        icon.textContent = '🏆';
+        title.textContent = '討伐大捷！民主曙光降臨王國！';
+        desc.innerHTML =
+          `勇者成功擊退守關魔物！<br>` +
+          `本次答對：<strong>${battleState.correctCount} / ${battleState.queue.length} 題</strong><br>` +
+          `獲得通關懸賞：<strong>+${clearBonus} 🪙 金幣</strong><br>` +
+          `目前稱號：<strong>${getRankTitle()}</strong>`;
+      } else {
+        AudioFX.wrong();
+        icon.textContent = '🛡️';
+        title.textContent = '勇者暫時撤退！回公會重整旗鼓！';
+        desc.innerHTML =
+          `雖然體力耗盡，但民主之路本來就充滿考驗！<br>` +
+          `建議前往<strong>【冒險者公會】</strong>使用金幣強化生命與聖劍，或翻閱<strong>【知識魔導書】</strong>後再次挑戰！`;
+      }
+
+      modal.classList.add('show');
+    }
+
+    function closeModalAndRestart() {
+      document.getElementById('resultModal').classList.remove('show');
+      startCampaign(battleState.mode);
+    }
+
+    function closeModalToGuild() {
+      document.getElementById('resultModal').classList.remove('show');
+      switchView('guild');
+    }
+
+    /* 渲染知識魔導書列表 */
+    function renderCodex() {
+      const container = document.getElementById('codexList');
+      const keys = ['A', 'B', 'C', 'D'];
+      container.innerHTML = QUESTION_BANK.map((q, idx) => `
+        <div class="codex-item">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <span class="category-chip">第 ${idx + 1} 題｜${q.category}</span>
+            <span style="color:#4ade80; font-size:0.84rem; font-weight:800;">正解：(${keys[q.answerIndex]}) ${q.options[q.answerIndex]}</span>
+          </div>
+          <div style="font-weight:800; color:#f8fafc; font-size:0.96rem;">${q.prompt}</div>
+          <div style="font-size:0.86rem; color:#cbd5e1; line-height:1.5;">💡 <strong>名師解析：</strong>${q.explanation}</div>
+        </div>
+      `).join('');
+    }
+
+    // 初始化啟動
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSave();
+      renderCodex();
+      startCampaign('all');
+    });
+  </script>
+</body>
+</html>
